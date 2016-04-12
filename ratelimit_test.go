@@ -71,8 +71,8 @@ func TestRateLimiterExceeded(t *testing.T) {
 
 func TestRateLimiterPassExceptions(t *testing.T) {
 	limiter := NewRateLimiter(5, 5)
-	limiter.AddException(func(r *http.Request) bool { return r.Method == "GET" })
-	limiter.AddException(func(r *http.Request) bool { return r.Method == "PUT" })
+	limiter.Exception(func(r *http.Request) bool { return r.Method == "GET" })
+	limiter.Exception(func(r *http.Request) bool { return r.Method == "PUT" })
 
 	var called bool
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -112,8 +112,8 @@ func TestRateLimiterPassExceptions(t *testing.T) {
 
 func TestRateLimiterPassFilters(t *testing.T) {
 	limiter := NewRateLimiter(5, 5)
-	limiter.AddFilter(func(r *http.Request) bool { return r.Method == "GET" })
-	limiter.AddFilter(func(r *http.Request) bool { return r.URL.Path == "/" })
+	limiter.Filter(func(r *http.Request) bool { return r.Method == "GET" })
+	limiter.Filter(func(r *http.Request) bool { return r.URL.Path == "/" })
 
 	var called bool
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

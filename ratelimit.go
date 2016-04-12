@@ -70,15 +70,15 @@ func (l *Limiter) SetResponder(fn http.HandlerFunc) {
 	l.responder = fn
 }
 
-// AddFilter adds a new rate limiter whitelist filter.
+// Filter adds a new rate limiter whitelist filter.
 // If the filter matches, the traffic won't be limited.
-func (l *Limiter) AddFilter(fn ...Filter) {
+func (l *Limiter) Filter(fn ...Filter) {
 	l.filters = append(l.filters, fn...)
 }
 
-// AddException adds a new rate limiter whitelist filter.
+// Exception adds a new rate limiter whitelist filter.
 // If the filter matches, the traffic won't be limited.
-func (l *Limiter) AddException(fn ...Exception) {
+func (l *Limiter) Exception(fn ...Exception) {
 	l.exceptions = append(l.exceptions, fn...)
 }
 
@@ -110,23 +110,29 @@ func (l *Limiter) LimitHTTP(h http.Handler) func(w http.ResponseWriter, r *http.
 		}
 
 		// Apply the rate limiter
-		available := l.bucket.TakeAvailable(1)
-
-		headers := w.Header()
-		headers.Set("X-RateLimit-Limit", strconv.Itoa(l.capacity()))
-		headers.Set("X-RateLimit-Remaining", strconv.Itoa(l.remaining()))
-
-		// If tokens are not available, reply with error, usually with 429
-		if available == 0 {
-			headers.Set("X-RateLimit-Reset", strconv.Itoa(int(l.resetTime())))
-			l.responder(w, r)
-			return
-		}
-
-		// Otherwise track time and forward the request
-		l.trackTime()
-		h.ServeHTTP(w, r)
+		l.limit(w, r, h)
 	}
+}
+
+// limit applies the rate limiter to the given HTTP request.
+// If the rate exceeds, will reply with an error.
+func (l *Limiter) limit(w http.ResponseWriter, r *http.Request, h http.Handler) {
+	available := l.bucket.TakeAvailable(1)
+
+	headers := w.Header()
+	headers.Set("X-RateLimit-Limit", strconv.Itoa(l.capacity()))
+	headers.Set("X-RateLimit-Remaining", strconv.Itoa(l.remaining()))
+
+	// If tokens are not available, reply with error, usually with 429
+	if available == 0 {
+		headers.Set("X-RateLimit-Reset", strconv.Itoa(int(l.resetTime())))
+		l.responder(w, r)
+		return
+	}
+
+	// Otherwise track time and forward the request
+	l.trackTime()
+	h.ServeHTTP(w, r)
 }
 
 // resetTime is used to calculate the pending reset time to wait.
