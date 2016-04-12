@@ -70,14 +70,14 @@ func (l *Limiter) SetResponder(fn http.HandlerFunc) {
 	l.responder = fn
 }
 
-// Filter adds a new rate limiter whitelist filter.
+// Filter registers a new rate limiter whitelist filter.
 // If the filter matches, the traffic won't be limited.
 func (l *Limiter) Filter(fn ...Filter) {
 	l.filters = append(l.filters, fn...)
 }
 
-// Exception adds a new rate limiter whitelist filter.
-// If the filter matches, the traffic won't be limited.
+// Exception registers whitelist exception.
+// If the exception function matches, the traffic won't be limited.
 func (l *Limiter) Exception(fn ...Exception) {
 	l.exceptions = append(l.exceptions, fn...)
 }
