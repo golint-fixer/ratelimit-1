@@ -7,6 +7,7 @@ go:
 
 before_install:
   - go get github.com/nbio/st
+  - go get -u gopkg.in/vinxi/layer.v0
   - go get -u github.com/juju/ratelimit
   - go get -u -v github.com/axw/gocov/gocov
   - go get -u -v github.com/mattn/goveralls
