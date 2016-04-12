@@ -1,4 +1,4 @@
-// The ratelimit package provides an efficient token bucket implementation
+// Package ratelimit provides an efficient token bucket implementation
 // that can be used to limit the rate concurrent HTTP traffic.
 // See http://en.wikipedia.org/wiki/Token_bucket.
 package ratelimit
