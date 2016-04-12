@@ -16,6 +16,9 @@ import (
 // Filter represents the Limiter filter function signature.
 type Filter func(r *http.Request) bool
 
+// Exception represents the Limiter exception function signature.
+type Exception Filter
+
 // RateLimitResponder is used as default function to repond when the
 // rate limit is reached. You can customize it via Limiter.SetResponder(fn).
 var RateLimitResponder = func(w http.ResponseWriter, r *http.Request) {
@@ -36,8 +39,10 @@ type Limiter struct {
 	bucket *ratelimit.Bucket
 	// responser stores the responder function used when the rate limit is reached.
 	responder http.HandlerFunc
-	// filters stores a list of filters to determine if should not apply the rate limiter.
+	// filters stores a list of filters to determine if should apply the rate limiter.
 	filters []Filter
+	// exceptions stores a list of exceptions to determine if should not apply the rate limiter.
+	exceptions []Exception
 }
 
 // NewTimeLimiter creates a new time based rate limiter middleware.
@@ -71,6 +76,12 @@ func (l *Limiter) AddFilter(fn ...Filter) {
 	l.filters = append(l.filters, fn...)
 }
 
+// AddException adds a new rate limiter whitelist filter.
+// If the filter matches, the traffic won't be limited.
+func (l *Limiter) AddException(fn ...Exception) {
+	l.exceptions = append(l.exceptions, fn...)
+}
+
 // Register registers the middleware handler.
 func (l *Limiter) Register(mw layer.Middleware) {
 	mw.UsePriority("request", layer.TopHead, l.LimitHTTP)
@@ -81,22 +92,31 @@ func (l *Limiter) Register(mw layer.Middleware) {
 // This method is used internally, but made public for public testing.
 func (l *Limiter) LimitHTTP(h http.Handler) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Pass filters
-		for _, filter := range l.filters {
-			if filter(r) {
+		// Run exceptions to ignore the limiter, if necessary
+		for _, exception := range l.exceptions {
+			if exception(r) {
 				h.ServeHTTP(w, r)
 				return
 			}
 		}
 
-		// Otherwise apply the rate limiter
+		// Pass filters to determine if should apply the limiter.
+		// All the filtes must pass to apply the limiter.
+		for _, filter := range l.filters {
+			if !filter(r) {
+				h.ServeHTTP(w, r)
+				return
+			}
+		}
+
+		// Apply the rate limiter
 		available := l.bucket.TakeAvailable(1)
 
 		headers := w.Header()
 		headers.Set("X-RateLimit-Limit", strconv.Itoa(l.capacity()))
-		headers.Set("X-RateLimit-Remaining", strconv.Itoa(l.reamining()))
+		headers.Set("X-RateLimit-Remaining", strconv.Itoa(l.remaining()))
 
-		// If no more tokens available, reply with 429
+		// If tokens are not available, reply with error, usually with 429
 		if available == 0 {
 			headers.Set("X-RateLimit-Reset", strconv.Itoa(int(l.resetTime())))
 			l.responder(w, r)
@@ -129,7 +149,7 @@ func (l *Limiter) capacity() int {
 }
 
 // remaining is used to read the current pending remaining available buckets.
-func (l *Limiter) reamining() int {
+func (l *Limiter) remaining() int {
 	if remaining := int(l.bucket.Available()); remaining > 0 {
 		return remaining
 	}

@@ -2,6 +2,8 @@
 
 Simple, efficient token bucket rate limiter for your proxies.
 
+Supports filters and whitelist exceptions to determine when to apply the rate limiter.
+
 ## Installation
 
 ```bash

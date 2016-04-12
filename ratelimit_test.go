@@ -2,6 +2,7 @@ package ratelimit
 
 import (
 	"net/http"
+	"net/url"
 	"strconv"
 	"testing"
 	"time"
@@ -68,16 +69,17 @@ func TestRateLimiterExceeded(t *testing.T) {
 	}
 }
 
-func TestRateLimiterPassFilter(t *testing.T) {
+func TestRateLimiterPassExceptions(t *testing.T) {
 	limiter := NewRateLimiter(5, 5)
-	limiter.AddFilter(func(r *http.Request) bool { return r.Method == "GET" })
+	limiter.AddException(func(r *http.Request) bool { return r.Method == "GET" })
+	limiter.AddException(func(r *http.Request) bool { return r.Method == "PUT" })
 
 	var called bool
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
 	})
 
-	// Passes the filter
+	// Pass exceptions
 	rw := utils.NewWriterStub()
 	req := &http.Request{Method: "GET"}
 
@@ -92,7 +94,7 @@ func TestRateLimiterPassFilter(t *testing.T) {
 	st.Expect(t, rw.Header().Get("X-RateLimit-Remaining"), "")
 	st.Expect(t, rw.Header().Get("X-RateLimit-Reset"), "")
 
-	// Do not passes the filter
+	// Do not pass exceptions
 	rw = utils.NewWriterStub()
 	req = &http.Request{Method: "POST"}
 
@@ -105,6 +107,47 @@ func TestRateLimiterPassFilter(t *testing.T) {
 	st.Expect(t, string(rw.Body), "foo")
 	st.Expect(t, rw.Header().Get("X-RateLimit-Limit"), "5")
 	st.Expect(t, rw.Header().Get("X-RateLimit-Remaining"), "4")
+	st.Expect(t, rw.Header().Get("X-RateLimit-Reset"), "")
+}
+
+func TestRateLimiterPassFilters(t *testing.T) {
+	limiter := NewRateLimiter(5, 5)
+	limiter.AddFilter(func(r *http.Request) bool { return r.Method == "GET" })
+	limiter.AddFilter(func(r *http.Request) bool { return r.URL.Path == "/" })
+
+	var called bool
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+	})
+
+	// Pass filters
+	rw := utils.NewWriterStub()
+	req := &http.Request{Method: "GET", URL: &url.URL{Path: "/"}}
+
+	limiter.LimitHTTP(handler)(rw, req)
+	rw.WriteHeader(200)
+	rw.Write([]byte("foo"))
+
+	st.Expect(t, called, true)
+	st.Expect(t, rw.Code, 200)
+	st.Expect(t, string(rw.Body), "foo")
+	st.Expect(t, rw.Header().Get("X-RateLimit-Limit"), "5")
+	st.Expect(t, rw.Header().Get("X-RateLimit-Remaining"), "4")
+	st.Expect(t, rw.Header().Get("X-RateLimit-Reset"), "")
+
+	// Do not pass filters
+	rw = utils.NewWriterStub()
+	req = &http.Request{Method: "POST"}
+
+	limiter.LimitHTTP(handler)(rw, req)
+	rw.WriteHeader(200)
+	rw.Write([]byte("foo"))
+
+	st.Expect(t, called, true)
+	st.Expect(t, rw.Code, 200)
+	st.Expect(t, string(rw.Body), "foo")
+	st.Expect(t, rw.Header().Get("X-RateLimit-Limit"), "")
+	st.Expect(t, rw.Header().Get("X-RateLimit-Remaining"), "")
 	st.Expect(t, rw.Header().Get("X-RateLimit-Reset"), "")
 }
 
