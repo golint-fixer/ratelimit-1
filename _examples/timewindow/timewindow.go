@@ -14,7 +14,7 @@ func main() {
 	vs := vinxi.NewServer(vinxi.ServerOptions{Port: port})
 
 	// Attach the rate limit middleware for 10 req/min
-	vs.Use(ratelimit.NewTimeLimiter(time.Minute, 10))
+	vs.Use(ratelimit.NewTimeLimiter(time.Minute, 1))
 
 	// Target server to forward
 	vs.Forward("http://httpbin.org")

@@ -6,7 +6,6 @@ package ratelimit
 import (
 	"net/http"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/juju/ratelimit"
@@ -29,12 +28,6 @@ var RateLimitResponder = func(w http.ResponseWriter, r *http.Request) {
 // Limiter implements a token bucket rate limiter middleware.
 // Rate limiter can support multiple rate limit strategies, such as time based limiter.
 type Limiter struct {
-	// timeWindow stores the rate limiter time window.
-	timeWindow time.Duration
-	// lm provides thread synchronization to lastAvailable field.
-	lm sync.Mutex
-	// lastAvailable stores the last time that the limiter had available tokens.
-	lastAvailable time.Time
 	// bucket stores the ratelimit.Bucket limiter currently used.
 	bucket *ratelimit.Bucket
 	// responser stores the responder function used when the rate limit is reached.
@@ -48,10 +41,8 @@ type Limiter struct {
 // NewTimeLimiter creates a new time based rate limiter middleware.
 func NewTimeLimiter(timeWindow time.Duration, capacity int64) *Limiter {
 	return &Limiter{
-		responder:     RateLimitResponder,
-		timeWindow:    timeWindow,
-		lastAvailable: time.Now(),
-		bucket:        ratelimit.NewBucket(timeWindow, capacity),
+		responder: RateLimitResponder,
+		bucket:    ratelimit.NewBucket(timeWindow, capacity),
 	}
 }
 
@@ -59,9 +50,8 @@ func NewTimeLimiter(timeWindow time.Duration, capacity int64) *Limiter {
 // amount of requests accepted per second.
 func NewRateLimiter(rate float64, capacity int64) *Limiter {
 	return &Limiter{
-		responder:  RateLimitResponder,
-		timeWindow: time.Second,
-		bucket:     ratelimit.NewBucketWithRate(rate, capacity),
+		responder: RateLimitResponder,
+		bucket:    ratelimit.NewBucketWithRate(rate, capacity),
 	}
 }
 
@@ -125,28 +115,12 @@ func (l *Limiter) limit(w http.ResponseWriter, r *http.Request, h http.Handler) 
 
 	// If tokens are not available, reply with error, usually with 429
 	if available == 0 {
-		headers.Set("X-RateLimit-Reset", strconv.Itoa(int(l.resetTime())))
 		l.responder(w, r)
 		return
 	}
 
 	// Otherwise track time and forward the request
-	l.trackTime()
 	h.ServeHTTP(w, r)
-}
-
-// resetTime is used to calculate the pending reset time to wait.
-func (l *Limiter) resetTime() time.Duration {
-	l.lm.Lock()
-	defer l.lm.Unlock()
-	return time.Now().Sub(l.lastAvailable) / time.Second
-}
-
-// trackTime is used to track the last time that tokens were available.
-func (l *Limiter) trackTime() {
-	l.lm.Lock()
-	l.lastAvailable = time.Now()
-	l.lm.Unlock()
 }
 
 // capacity is used to read the current bucket capacity.

@@ -58,13 +58,11 @@ func TestRateLimiterExceeded(t *testing.T) {
 			st.Expect(t, rw.Code, 200)
 			st.Expect(t, string(rw.Body), "foo")
 			st.Expect(t, rw.Header().Get("X-RateLimit-Remaining"), strconv.Itoa(5-(i+1)))
-			st.Expect(t, rw.Header().Get("X-RateLimit-Reset"), "")
 		} else {
 			st.Expect(t, calls, 5)
 			st.Expect(t, rw.Code, 429)
 			st.Expect(t, string(rw.Body), "Too Many Requests")
 			st.Expect(t, rw.Header().Get("X-RateLimit-Remaining"), "0")
-			st.Expect(t, rw.Header().Get("X-RateLimit-Reset"), "0")
 		}
 	}
 }
@@ -92,7 +90,6 @@ func TestRateLimiterPassExceptions(t *testing.T) {
 	st.Expect(t, string(rw.Body), "foo")
 	st.Expect(t, rw.Header().Get("X-RateLimit-Limit"), "")
 	st.Expect(t, rw.Header().Get("X-RateLimit-Remaining"), "")
-	st.Expect(t, rw.Header().Get("X-RateLimit-Reset"), "")
 
 	// Do not pass exceptions
 	rw = utils.NewWriterStub()
@@ -107,7 +104,6 @@ func TestRateLimiterPassExceptions(t *testing.T) {
 	st.Expect(t, string(rw.Body), "foo")
 	st.Expect(t, rw.Header().Get("X-RateLimit-Limit"), "5")
 	st.Expect(t, rw.Header().Get("X-RateLimit-Remaining"), "4")
-	st.Expect(t, rw.Header().Get("X-RateLimit-Reset"), "")
 }
 
 func TestRateLimiterPassFilters(t *testing.T) {
@@ -133,7 +129,6 @@ func TestRateLimiterPassFilters(t *testing.T) {
 	st.Expect(t, string(rw.Body), "foo")
 	st.Expect(t, rw.Header().Get("X-RateLimit-Limit"), "5")
 	st.Expect(t, rw.Header().Get("X-RateLimit-Remaining"), "4")
-	st.Expect(t, rw.Header().Get("X-RateLimit-Reset"), "")
 
 	// Do not pass filters
 	rw = utils.NewWriterStub()
@@ -148,7 +143,6 @@ func TestRateLimiterPassFilters(t *testing.T) {
 	st.Expect(t, string(rw.Body), "foo")
 	st.Expect(t, rw.Header().Get("X-RateLimit-Limit"), "")
 	st.Expect(t, rw.Header().Get("X-RateLimit-Remaining"), "")
-	st.Expect(t, rw.Header().Get("X-RateLimit-Reset"), "")
 }
 
 func TestRateLimiterResponder(t *testing.T) {
@@ -176,5 +170,4 @@ func TestRateLimiterResponder(t *testing.T) {
 	st.Expect(t, string(rw.Body), "wait, dude")
 	st.Expect(t, rw.Header().Get("X-RateLimit-Limit"), "1")
 	st.Expect(t, rw.Header().Get("X-RateLimit-Remaining"), "0")
-	st.Expect(t, rw.Header().Get("X-RateLimit-Reset"), "0")
 }
